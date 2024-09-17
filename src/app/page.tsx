@@ -4,19 +4,17 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { client } from "./services/client";
 import type { Schema } from "../../amplify/data/resource";
-
 import { FaTrash } from 'react-icons/fa';
 import { Amplify } from 'aws-amplify';
 import outputs from '../../amplify_outputs.json';
 
 Amplify.configure(outputs);
 
-
-
 export default function Home() {
 
   const [todos, setTodos] = useState<Schema["Todo"]["type"][]>([]);
   const [content, setContent] = useState<string>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     const sub = client.models.Todo.observeQuery().subscribe({
@@ -26,21 +24,36 @@ export default function Home() {
     });
 
     return () => sub.unsubscribe();
-
   }, []);
 
-    
   function deleteTodo(id: string) {
-    client.models.Todo.delete({ id })
+    client.models.Todo.delete({ id });
   }
 
-
   const createTodo = async () => {
-    console.log(todos, "createTodo");
-    await client.models.Todo.create({
-      content: content,
-    });
+    if (editingId) {
+      await updateTodo();
+    } else {
+      await client.models.Todo.create({
+        content: content,
+      });
+    }
+    setContent(""); 
+  }
 
+  const updateTodo = async () => {
+    if (editingId) {
+      await client.models.Todo.update({
+        id: editingId,
+        content: content,
+      });
+      setEditingId(null);
+    }
+  }
+
+  const editTodo = (id: string, currentContent: string) => {
+    setEditingId(id);
+    setContent(currentContent);
   }
 
   return (
@@ -59,7 +72,7 @@ export default function Home() {
         <button 
           onClick={createTodo} 
           className="p-2 bg-blue-500 text-white rounded">
-          Adicionar
+          {editingId ? "Atualizar" : "Adicionar"} {/* Muda o texto conforme o contexto */}
         </button>
       </div>
       <div className="flex flex-col gap-4">
@@ -70,6 +83,9 @@ export default function Home() {
                 <div className="flex flex-row items-center p-[10px] rounded bg-violet-950 w-[280px]">
                   <p className="text-white">{content}</p>
                 </div>
+                <button onClick={() => editTodo(id, content)} className="bg-gray-50 p-[4px] rounded">
+                  Editar
+                </button>
                 <button onClick={() => deleteTodo(id)} className="bg-gray-50 p-[4px] rounded">
                   <FaTrash className="text-[24px] text-red-600"/>
                 </button>
@@ -81,6 +97,3 @@ export default function Home() {
     </main>
   );
 }
-
-
-
